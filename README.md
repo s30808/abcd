@@ -1,3 +1,103 @@
+=========================================================
+MINI PORADNIK - MINIMUM DO ZALICZENIA WEB API (DATABASE FIRST)
+=========================================================
+
+KROK 1: NIEZBĘDNE PACZKI NUGET
+Zainstaluj te 3 paczki przez terminal lub okno NuGet, aby móc połączyć się z bazą:
+1. Microsoft.EntityFrameworkCore.SqlServer
+2. Microsoft.EntityFrameworkCore.Design
+3. Microsoft.EntityFrameworkCore.Tools
+
+---------------------------------------------------------
+
+KROK 2: WYGENEROWANIE MODELI Z BAZY (SCAFFOLDING)
+Otwórz terminal w Riderze i wklej tę komendę (jeśli masz użyć bazy 'master'):
+dotnet ef dbcontext scaffold "Data Source=(localdb)\MSSQLLocalDB;Initial Catalog=master;Integrated Security=True;TrustServerCertificate=True" Microsoft.EntityFrameworkCore.SqlServer -o Models -c HospitalDbContext
+
+---------------------------------------------------------
+
+KROK 3: KONFIGURACJA appsettings.json
+Dodaj sekcję "ConnectionStrings" z podwójnymi ukośnikami (\\):
+
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "AllowedHosts": "*",
+  "ConnectionStrings": {
+    "DefaultConnection": "Data Source=(localdb)\\MSSQLLocalDB;Initial Catalog=master;Integrated Security=True;TrustServerCertificate=True"
+  }
+}
+
+---------------------------------------------------------
+
+KROK 4: KONFIGURACJA Program.cs (Z TRIKIEM NA ZAPĘTLENIA)
+Podmień zawartość Program.cs na to (zmień 'TwojaNazwaProjektu'):
+
+using TwojaNazwaProjektu.Models;
+using Microsoft.EntityFrameworkCore;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// Dodanie kontrolerów + TRIK: Ignorowanie cykli, żeby można było zwracać encje prosto z bazy bez DTO
+builder.Services.AddControllers().AddJsonOptions(options =>
+{
+    options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
+});
+
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
+// Rejestracja bazy danych
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+builder.Services.AddDbContext<HospitalDbContext>(options =>
+    options.UseSqlServer(connectionString));
+
+var app = builder.Build();
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
+app.UseHttpsRedirection();
+app.MapControllers();
+app.Run();
+
+---------------------------------------------------------
+
+KROK 5: MINIMALNY DZIAŁAJĄCY KONTROLER
+Dodaj plik MinimalController.cs w folderze Controllers:
+
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using TwojaNazwaProjektu.Models; // Zmień na swoją nazwę
+
+namespace TwojaNazwaProjektu.Controllers
+{
+    [Route("api/[controller]")]
+    [ApiController]
+    public class MinimalController : ControllerBase
+    {
+        private readonly HospitalDbContext _context;
+
+        public MinimalController(HospitalDbContext context)
+        {
+            _context = context;
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> Get()
+        {
+            // Zwraca wszystko z tabeli bez pisania DTO (działa dzięki trikowi w Program.cs)
+            return Ok(await _context.Patients.ToListAsync());
+        }
+    }
+}
 # abcd
 
 {
